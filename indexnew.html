@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Community Health Dashboard - SIH 25001</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { margin:0; font-family:Arial,sans-serif; background:#1e1f29; color:#eee; }
+  header { padding:12px 20px; background:#111; display:flex; align-items:center; justify-content:space-between; }
+  header h1 { margin:0; font-size:18px; }
+  .container { display:flex; height:calc(100vh - 60px); }
+  .sidebar { width:300px; background:#222; padding:12px; overflow-y:auto; }
+  .main { flex:1; display:flex; flex-direction:column; padding:12px; overflow-y:auto; }
+  .card { background:#2b2c3b; margin-bottom:12px; border-radius:8px; padding:12px; box-shadow:0 4px 10px rgba(0,0,0,0.4); }
+  #map { height:300px; border-radius:8px; }
+  table { width:100%; border-collapse:collapse; color:#eee; }
+  th, td { padding:6px; text-align:left; border-bottom:1px solid #444; font-size:13px; }
+  th { background:#333; }
+  .high { color:#ff4d4d; font-weight:bold; }
+  .medium { color:#ffa500; font-weight:bold; }
+  .low { color:#4cd137; font-weight:bold; }
+  .alert-card { padding:8px; margin:4px 0; border-radius:6px; }
+  .alert-high { background:#ff4d4d33; border-left:4px solid #ff4d4d; }
+  .alert-medium { background:#ffa50033; border-left:4px solid #ffa500; }
+  .alert-low { background:#4cd13733; border-left:4px solid #4cd137; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SIH 25001 - Smart Health Dashboard</h1>
+  <div>Mode: <strong id="modeLabel">Demo</strong></div>
+</header>
+
+<div class="container">
+  <aside class="sidebar">
+    <div class="card">
+      <h3>Village & Officer Info</h3>
+      <input type="text" id="searchVillage" placeholder="Search village..." style="width:100%;padding:6px;margin-bottom:6px;border-radius:4px;border:none;">
+      <table id="villageTable">
+        <thead>
+          <tr><th>Village</th><th>Status</th><th>Officer</th><th>Contact</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Alerts</h3>
+      <div id="alerts"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="card">
+      <h3>Map - Contamination Spots</h3>
+      <div id="map"></div>
+    </div>
+    <div class="card">
+      <h3>Water Quality Trends</h3>
+      <canvas id="lineChart" height="150"></canvas>
+      <canvas id="barChart" height="150" style="margin-top:12px"></canvas>
+    </div>
+    <div class="card">
+      <h3>Incoming Sensor Feed</h3>
+      <div id="sensorFeed">No readings yet</div>
+    </div>
+  </main>
+</div>
+
+<script>
+// Sample Data
+const villages = {
+  'Tamenglong': {lat:24.99, lng:93.58, officer:'Dr. Singh', contact:'+91 9876543210'},
+  'Guwahati': {lat:26.1445, lng:91.7362, officer:'Ms. Devi', contact:'+91 9123456780'},
+  'Imphal': {lat:24.817, lng:93.9368, officer:'Mr. Ranjan', contact:'+91 9988776655'},
+  'Aizawl': {lat:23.7271, lng:92.7176, officer:'Dr. Lalthansanga', contact:'+91 9876501234'},
+  'Shillong': {lat:25.57, lng:91.88, officer:'Ms. Mary', contact:'+91 9871234567'},
+  'Agartala': {lat:23.83, lng:91.28, officer:'Mr. Das', contact:'+91 9123456789'}
+};
+
+// Sample Sensor Data
+let sensors = [
+  {village:'Tamenglong', level:75, turb:60, ph:6.8, contamination:80},
+  {village:'Guwahati', level:60, turb:30, ph:7.1, contamination:35},
+  {village:'Imphal', level:55, turb:50, ph:6.5, contamination:50},
+  {village:'Aizawl', level:70, turb:40, ph:7.3, contamination:25},
+  {village:'Shillong', level:50, turb:65, ph:6.4, contamination:70},
+  {village:'Agartala', level:65, turb:20, ph:7.0, contamination:15}
+];
+
+// Initialize Map
+const map = L.map('map').setView([25.5, 92.5], 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
+
+const markers = {};
+function renderMap() {
+  sensors.forEach(s => {
+    const color = s.contamination>70?'red':s.contamination>40?'orange':'green';
+    const icon = L.divIcon({className:'custom-marker', html:`<div style="width:16px;height:16px;background:${color};border-radius:50%;border:2px solid white;"></div>`, iconSize:[18,18]});
+    if(markers[s.village]) markers[s.village].setIcon(icon);
+    else markers[s.village] = L.marker([villages[s.village].lat, villages[s.village].lng], {icon}).addTo(map)
+      .bindPopup(`<strong>${s.village}</strong><br/>Contamination: ${s.contamination}%<br/>Turbidity: ${s.turb}<br/>pH: ${s.ph}<br/>Officer: ${villages[s.village].officer}<br/>Contact: ${villages[s.village].contact}`);
+  });
+}
+
+// Render Village Table
+function renderTable() {
+  const tbody = document.querySelector('#villageTable tbody');
+  tbody.innerHTML = '';
+  sensors.forEach(s => {
+    const tr = document.createElement('tr');
+    let statusClass = s.contamination>70?'high':s.contamination>40?'medium':'low';
+    tr.innerHTML = `<td>${s.village}</td><td class="${statusClass}">${statusClass.toUpperCase()}</td><td>${villages[s.village].officer}</td><td>${villages[s.village].contact}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Render Charts
+let lineChart, barChart;
+function initCharts() {
+  const ctxLine = document.getElementById('lineChart').getContext('2d');
+  lineChart = new Chart(ctxLine, {
+    type:'line',
+    data:{labels:[], datasets:[
+      {label:'Contamination', data:[], borderColor:'red', fill:false, tension:0.3},
+      {label:'pH', data:[], borderColor:'blue', fill:false, tension:0.3}
+    ]},
+    options:{responsive:true, plugins:{legend:{labels:{color:'#eee'}}}, scales:{y:{beginAtZero:true, ticks:{color:'#eee'}}, x:{ticks:{color:'#eee'}}}}
+  });
+  
+  const ctxBar = document.getElementById('barChart').getContext('2d');
+  barChart = new Chart(ctxBar, {
+    type:'bar',
+    data:{labels:[], datasets:[
+      {label:'Turbidity', data:[], backgroundColor:'orange'},
+      {label:'Water Level', data:[], backgroundColor:'green'}
+    ]},
+    options:{responsive:true, plugins:{legend:{labels:{color:'#eee'}}}, scales:{y:{beginAtZero:true, ticks:{color:'#eee'}}, x:{ticks:{color:'#eee'}}}}
+  });
+}
+
+function updateCharts() {
+  const labels = sensors.map(s=>s.village);
+  lineChart.data.labels = labels;
+  lineChart.data.datasets[0].data = sensors.map(s=>s.contamination);
+  lineChart.data.datasets[1].data = sensors.map(s=>s.ph);
+  lineChart.update();
+
+  barChart.data.labels = labels;
+  barChart.data.datasets[0].data = sensors.map(s=>s.turb);
+  barChart.data.datasets[1].data = sensors.map(s=>s.level);
+  barChart.update();
+}
+
+// Alerts Panel
+function renderAlerts() {
+  const alertsDiv = document.getElementById('alerts');
+  alertsDiv.innerHTML = '';
+  sensors.forEach(s=>{
+    if(s.contamination>70) alertsDiv.innerHTML += `<div class="alert-card alert-high">High Risk: ${s.village} contamination ${s.contamination}%</div>`;
+    else if(s.contamination>40) alertsDiv.innerHTML += `<div class="alert-card alert-medium">Medium Risk: ${s.village} contamination ${s.contamination}%</div>`;
+    else alertsDiv.innerHTML += `<div class="alert-card alert-low">Low Risk: ${s.village} contamination ${s.contamination}%</div>`;
+  });
+}
+
+// Sensor Feed
+function renderSensorFeed() {
+  const feedDiv = document.getElementById('sensorFeed');
+  const last = sensors[sensors.length-1];
+  feedDiv.textContent = `${last.village} — Level:${last.level} Turb:${last.turb} pH:${last.ph} Cont:${last.contamination}`;
+}
+
+// Search Village
+document.getElementById('searchVillage').addEventListener('input', (e)=>{
+  const search = e.target.value.toLowerCase();
+  const tbody = document.querySelector('#villageTable tbody');
+  Array.from(tbody.rows).forEach(row=>{
+    row.style.display = row.cells[0].textContent.toLowerCase().includes(search)? '' : 'none';
+  });
+});
+
+// Simulate Updates (replace with API fetch for real data)
+function simulateUpdates() {
+  sensors.forEach(s=>{
+    s.level = Math.round(50 + Math.random()*30);
+    s.turb = Math.round(20 + Math.random()*50);
+    s.ph = (6 + Math.random()*2).toFixed(2);
+    s.contamination = Math.round(Math.random()*100);
+  });
+  renderMap();
+  renderTable();
+  updateCharts();
+  renderAlerts();
+  renderSensorFeed();
+}
+
+// Initialize
+initCharts();
+simulateUpdates();
+renderMap();
+renderTable();
+updateCharts();
+renderAlerts();
+renderSensorFeed();
+
+// Auto-update every 10 sec for demo
+setInterval(simulateUpdates, 10000);
+
+</script>
+
+</body>
+</html>

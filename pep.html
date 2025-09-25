@@ -1,0 +1,2694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SIH25001 — Smart Community water level monitoring(Enhanced)</title>
+
+<!-- Leaflet & Plugins CSS and JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Font Awesome for Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --muted:#9aa4b2; --accent:#1fb6ff; --danger:#ff5c5c;
+    --glass: rgba(255,255,255,0.03); --success: #5fe9a3; --warning: #ffae42;
+    --gradient-primary: linear-gradient(135deg, #1fb6ff 0%, #0099cc 100%);
+    --gradient-danger: linear-gradient(135deg, #ff5c5c 0%, #cc4444 100%);
+    --gradient-success: linear-gradient(135deg, #5fe9a3 0%, #4cc080 100%);
+  }
+  
+  *{box-sizing:border-box}
+  
+  body{
+    margin:0;
+    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+    color:#e6eef6;
+    background:linear-gradient(180deg,#071020 0%, #081627 100%);
+    overflow-x: hidden;
+  }
+  
+  /* Enhanced Header */
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 18px;
+    background:linear-gradient(90deg,var(--card),#071428);
+    position:sticky;
+    top:0;
+    z-index:40;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    animation: slideDown 0.5s ease-out;
+  }
+  
+  @keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+  }
+  
+  header h1{
+    margin:0;
+    font-size:16px;
+    color:var(--accent);
+    text-shadow: 0 0 10px rgba(31,182,255,0.5);
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  @keyframes glow {
+    from { text-shadow: 0 0 10px rgba(31,182,255,0.5); }
+    to { text-shadow: 0 0 20px rgba(31,182,255,0.8), 0 0 30px rgba(31,182,255,0.4); }
+  }
+  
+  .top-actions{
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  
+  .btn{
+    background:var(--gradient-primary);
+    color:#042033;
+    padding:8px 12px;
+    border-radius:8px;
+    border:none;
+    cursor:pointer;
+    font-weight:600;
+    transition:all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+  }
+  
+  .btn:hover::before {
+    left: 100%;
+  }
+  
+  .btn-ghost{
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.2);
+    color:#cfe8ff;
+    padding:6px 10px;
+    border-radius:8px;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  
+  .btn:hover{
+    transform:scale(1.05) translateY(-2px);
+    box-shadow: 0 8px 25px rgba(31,182,255,0.4);
+  }
+  
+  .btn-ghost:hover{
+    background:rgba(255,255,255,0.1);
+    border-color: var(--accent);
+    box-shadow: 0 4px 15px rgba(31,182,255,0.2);
+  }
+  
+  /* Enhanced Layout */
+  .layout{
+    display:grid;
+    grid-template-columns:300px 1fr;
+    gap:16px;
+    padding:18px;
+    align-items:start;
+    animation: fadeInUp 0.6s ease-out;
+  }
+  
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .nav{
+    background:var(--card);
+    border-radius:12px;
+    padding:12px;
+    height:calc(100vh - 88px);
+    overflow:auto;
+    box-shadow:0 0 6px 1px rgba(31,182,255,0.12);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  
+  .nav h3{
+    margin:6px 0 10px 0;
+    color:var(--muted);
+    font-size:13px;
+  }
+  
+  .nav a{
+    display:flex;
+    align-items: center;
+    padding:10px;
+    border-radius:8px;
+    color:#dff2ff;
+    text-decoration:none;
+    margin-bottom:6px;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  
+  .nav a i {
+    margin-right: 8px;
+    width: 16px;
+  }
+  
+  .nav a.active, .nav a:hover{
+    background:var(--gradient-primary);
+    box-shadow:0 8px 30px rgba(31,182,255,0.3);
+    transform: translateX(5px);
+  }
+  
+  .main{
+    min-height:80vh;
+    padding:0;
+    overflow:auto;
+  }
+  
+  .card{
+    background:var(--card);
+    padding:18px;
+    border-radius:12px;
+    margin-bottom:14px;
+    box-shadow:0 8px 30px rgba(2,6,23,0.6);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gradient-primary);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  
+  .card:hover{
+    box-shadow:0 12px 40px rgba(31,182,255,0.2);
+    transform: translateY(-5px);
+  }
+  
+  .card:hover::before {
+    opacity: 1;
+  }
+  
+  .row{display:flex;gap:12px;flex-wrap: wrap;}
+  .col{flex:1;min-width: 250px;}
+  
+  /* Enhanced Map */
+  #map{
+    height:420px;
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:0 0 20px rgba(31,182,255,0.3);
+    border: 2px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+  }
+  
+  #map:hover {
+    box-shadow:0 0 30px rgba(31,182,255,0.5);
+  }
+  
+  /* Enhanced Tables */
+  table{
+    width:100%;
+    border-collapse:collapse;
+    color:#dff2ff;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  th,td{
+    padding:12px 8px;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+    font-size:13px;
+    transition: background-color 0.3s ease;
+  }
+  
+  tbody tr:hover {
+    background-color: rgba(31,182,255,0.1);
+  }
+  
+  th{
+    color:var(--muted);
+    text-align:left;
+    background:rgba(0,0,0,0.3);
+    font-weight: 600;
+  }
+  
+  .risk-high{color:var(--danger);font-weight:700;text-shadow: 0 0 10px var(--danger);}
+  .risk-med{color:#ffae42;font-weight:700;text-shadow: 0 0 10px #ffae42;}
+  .risk-low{color:#5fe9a3;font-weight:700;text-shadow: 0 0 10px #5fe9a3;}
+  
+  .small{font-size:12px;color:var(--muted)}
+  
+  /* Enhanced Form Elements */
+  input,select,textarea{
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.2);
+    background:rgba(255,255,255,0.05);
+    color:#dff2ff;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+  }
+  
+  input:focus,select:focus,textarea:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 15px rgba(31,182,255,0.4);
+    background:rgba(255,255,255,0.1);
+  }
+  
+  label{
+    font-size:13px;
+    color:var(--muted);
+    display:block;
+    margin:8px 0 4px 0;
+    font-weight: 500;
+  }
+  
+  .flex{display:flex;gap:8px;align-items:center;flex-wrap: wrap;}
+  .right{display:flex;gap:8px;align-items:center;flex-wrap: wrap;}
+  
+  /* Enhanced Chips */
+  .chip{
+    padding:6px 10px;
+    border-radius:20px;
+    background:rgba(255,255,255,0.1);
+    font-size:12px;
+    color:var(--muted);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.2);
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 5px rgba(31,182,255,0.3); }
+    50% { box-shadow: 0 0 15px rgba(31,182,255,0.6), 0 0 25px rgba(31,182,255,0.3); }
+  }
+  
+  /* Enhanced Alerts */
+  .alert{
+    padding:15px 18px;
+    border-radius:10px;
+    margin-bottom:10px;
+    font-weight:600;
+    box-shadow:0 6px 25px rgba(0,0,0,0.15);
+    position: relative;
+    animation: alertSlide 0.5s ease-out;
+    border-left: 4px solid;
+  }
+  
+  @keyframes alertSlide {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  
+  .alert.high{
+    background:linear-gradient(135deg, #ff4d4d22 0%, #cc444422 100%);
+    border-left-color:var(--danger);
+    color:var(--danger);
+    text-shadow:0 0 4px var(--danger);
+  }
+  
+  .alert.med{
+    background:linear-gradient(135deg, #ffae4222 0%, #cc882222 100%);
+    border-left-color:#ffae42;
+    color:#ffae42;
+    text-shadow:0 0 4px #ffae42;
+  }
+  
+  .alert.low{
+    background:linear-gradient(135deg, #5fe9a322 0%, #4cc08022 100%);
+    border-left-color:#5fe9a3;
+    color:#5fe9a3;
+    text-shadow:0 0 4px #5fe9a3;
+  }
+  
+  /* Stats Cards */
+  .stat-card {
+    background: var(--card);
+    padding: 16px;
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+  }
+  
+  .stat-card:hover::before {
+    transform: scaleX(1);
+  }
+  
+  .stat-number {
+    font-size: 32px;
+    font-weight: 900;
+    margin: 8px 0;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Notification System */
+  .notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+  }
+  
+  .notification {
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+    animation: slideInRight 0.3s ease-out;
+    position: relative;
+  }
+  
+  @keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  
+  .notification.success { border-left: 4px solid var(--success); }
+  .notification.warning { border-left: 4px solid var(--warning); }
+  .notification.danger { border-left: 4px solid var(--danger); }
+  
+  .notification .close-btn {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 16px;
+  }
+  
+  /* Loading Animation */
+  .loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+    border-top-color: var(--accent);
+    animation: spin 1s ease-in-out infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  /* Progress Bars */
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 8px 0;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    position: relative;
+  }
+  
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background-image: linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, .2) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, .2) 50%,
+      rgba(255, 255, 255, .2) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 50px 50px;
+    animation: move 2s linear infinite;
+  }
+  
+  @keyframes move {
+    0% { background-position: 0 0; }
+    100% { background-position: 50px 50px; }
+  }
+  
+  /* Enhanced Mobile Responsiveness */
+  @media(max-width:980px){
+    .layout{
+      grid-template-columns:1fr;
+      padding:12px;
+      gap: 12px;
+    }
+    
+    .nav{
+      height:auto;
+      display:flex;
+      overflow-x:auto;
+      gap:8px;
+      padding: 8px;
+    }
+    
+    .nav a {
+      white-space: nowrap;
+      margin-bottom: 0;
+      margin-right: 8px;
+    }
+    
+    #map{height:300px}
+    
+    .row { flex-direction: column; }
+    .col { min-width: auto; }
+    
+    .top-actions {
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    
+    .notification-container {
+      left: 10px;
+      right: 10px;
+      max-width: none;
+    }
+  }
+  
+  @media(max-width:600px){
+    header {
+      flex-direction: column;
+      padding: 10px;
+      gap: 10px;
+    }
+    
+    header h1 {
+      font-size: 14px;
+      text-align: center;
+    }
+    
+    .layout {
+      padding: 8px;
+    }
+    
+    .card {
+      padding: 12px;
+    }
+  }
+  
+  /* Dark scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--card);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #73cff6;
+  }
+  
+  /* Hide elements during page transitions */
+  .page-transition {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+  }
+  
+  .page-transition.active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  footer{display:none;}
+</style>
+</head>
+<body>
+
+<!-- Notification Container -->
+<div class="notification-container" id="notificationContainer"></div>
+
+<header>
+  <h1><i class="fas fa-heartbeat"></i> SIH25001 — Smart Community Health Monitoring & Early Warning</h1>
+  <div class="top-actions">
+    <div class="chip" id="langLabel"><i class="fas fa-globe"></i> EN</div>
+    <button class="btn-ghost" id="toggleLang" title="Switch Language">
+      <i class="fas fa-language"></i> Assamese
+    </button>
+    <button class="btn" id="downloadCsv" title="Download Reports CSV">
+      <i class="fas fa-download"></i> CSV
+    </button>
+    <button class="btn" id="toggleDemo" title="Toggle Sensor Simulation">
+      <i class="fas fa-play"></i> Simulate
+    </button>
+    <button class="btn" id="emergencyAlert" title="Send Emergency Alert">
+      <i class="fas fa-exclamation-triangle"></i> Emergency
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="nav" aria-label="Main navigation">
+    <h3><i class="fas fa-bars"></i> Navigation</h3>
+    <a href="#" class="active" data-page="dashboard">
+      <i class="fas fa-tachometer-alt"></i> Dashboard
+    </a>
+    <a href="#" data-page="report">
+      <i class="fas fa-file-medical-alt"></i> Reports
+    </a>
+    <a href="#" data-page="sensors">
+      <i class="fas fa-microchip"></i> Sensors & IoT
+    </a>
+    <a href="#" data-page="prediction">
+      <i class="fas fa-brain"></i> AI Prediction
+    </a>
+    <a href="#" data-page="alerts">
+      <i class="fas fa-bell"></i> Alert System
+    </a>
+    <a href="#" data-page="education">
+      <i class="fas fa-graduation-cap"></i> Education
+    </a>
+    <a href="#" data-page="analytics">
+      <i class="fas fa-chart-line"></i> Analytics
+    </a>
+    <a href="#" data-page="logs">
+      <i class="fas fa-clipboard-list"></i> Logs
+    </a>
+  </nav>
+
+  <main class="main">
+    <!-- DASHBOARD -->
+    <section class="card page-transition active" id="page-dashboard">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <div>
+          <h2><i class="fas fa-tachometer-alt"></i> Dashboard & Alerts</h2>
+          <small>Real-time monitoring of water quality and health data</small>
+        </div>
+        <div class="right">
+          <div class="chip" id="modeChip">
+            <i class="fas fa-satellite-dish"></i> LIVE MODE
+          </div>
+          <div class="chip" id="lastSync">
+            <i class="fas fa-sync-alt"></i> Last sync: <span id="syncTime">--</span>
+          </div>
+          <div class="chip" id="connectionStatus">
+            <i class="fas fa-wifi"></i> Connected
+          </div>
+        </div>
+      </div>
+      
+      <!-- Real-time Stats -->
+      <div class="row" style="margin-top:14px;">
+        <div class="col">
+          <div class="stat-card">
+            <i class="fas fa-droplet" style="font-size:24px; color:var(--danger);"></i>
+            <div class="stat-number" id="avgCont">--%</div>
+            <small>Average Contamination</small>
+            <div class="progress-bar">
+              <div class="progress-fill" id="contaminationProgress" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="stat-card">
+            <i class="fas fa-fire" style="font-size:24px; color:var(--warning);"></i>
+            <div class="stat-number" id="hotspotCount" style="color: var(--warning);">--</div>
+            <small>Active Hotspots</small>
+            <div class="progress-bar">
+              <div class="progress-fill" id="hotspotsProgress" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="stat-card">
+            <i class="fas fa-file-medical" style="font-size:24px; color:var(--success);"></i>
+            <div class="stat-number" id="reportsCount" style="color: var(--success);">--</div>
+            <small>Reports (24h)</small>
+            <div class="progress-bar">
+              <div class="progress-fill" id="reportsProgress" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="stat-card">
+            <i class="fas fa-users" style="font-size:24px; color:var(--accent);"></i>
+            <div class="stat-number" id="affectedCount" style="color: var(--accent);">--</div>
+            <small>People at Risk</small>
+            <div class="progress-bar">
+              <div class="progress-fill" id="riskProgress" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="flex" style="justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h3><i class="fas fa-map-marked-alt"></i> Real-time Contamination Map</h3>
+          <div class="right">
+            <button class="btn-ghost" id="refreshMap">
+              <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <button class="btn-ghost" id="toggleHeatmap">
+              <i class="fas fa-layer-group"></i> Heatmap
+            </button>
+            <button class="btn-ghost" id="fullscreenMap">
+              <i class="fas fa-expand"></i> Fullscreen
+            </button>
+          </div>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <div class="row" style="margin-top:14px;">
+        <div class="col card">
+          <h3><i class="fas fa-exclamation-triangle"></i> Active Alerts</h3>
+          <div id="alertsPanel"></div>
+          
+          <hr style="margin:14px 0; border:none; background:rgba(255,255,255,0.1); height:1px;">
+          
+          <h4><i class="fas fa-phone-alt"></i> Emergency Contacts</h4>
+          <div id="emergencyContacts"></div>
+        </div>
+        
+        <div class="col card">
+          <h3><i class="fas fa-chart-line"></i> Trends & Analytics</h3>
+          <canvas id="trendChart" height="140"></canvas>
+          <div style="margin: 10px 0;">
+            <button class="btn-ghost" id="changePeriod">
+              <i class="fas fa-calendar-alt"></i> Last 7 Days
+            </button>
+          </div>
+          <canvas id="barComparison" height="120" style="margin-top:10px;"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="card page-transition" id="page-report" style="display:none;">
+      <h2><i class="fas fa-file-medical-alt"></i> ASHA / Community Reporting</h2>
+      <small>Offline-capable reporting system with real-time sync</small>
+      
+      <div class="row" style="margin-top:12px;">
+        <div class="col card">
+          <h3><i class="fas fa-plus-circle"></i> New Report</h3>
+          <form id="reportForm">
+            <label><i class="fas fa-user"></i> Reporter Name
+              <input id="repName" placeholder="ASHA / Volunteer name" required />
+            </label>
+            <label><i class="fas fa-phone"></i> Contact
+              <input id="repContact" placeholder="+91..." required />
+            </label>
+            <label><i class="fas fa-map-marker-alt"></i> Village / Location
+              <select id="repVillage"></select>
+            </label>
+            <label><i class="fas fa-clipboard-list"></i> Report Type
+              <select id="repType">
+                <option value="water">Water Quality Issue</option>
+                <option value="symptom">Disease Symptoms</option>
+                <option value="outbreak">Suspected Outbreak</option>
+                <option value="infrastructure">Infrastructure Problem</option>
+                <option value="education">Education Request</option>
+              </select>
+            </label>
+            <label><i class="fas fa-thermometer-half"></i> Severity Level
+              <select id="repSeverity">
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+                <option value="critical">Critical/Emergency</option>
+              </select>
+            </label>
+            <label><i class="fas fa-edit"></i> Details / Symptoms
+              <textarea id="repNotes" rows="4" placeholder="Describe symptoms, observations, water quality issues, or infrastructure problems"></textarea>
+            </label>
+            <label><i class="fas fa-image"></i> Photo Evidence
+              <input type="file" id="repPhoto" accept="image/*" />
+            </label>
+            <div class="row" style="margin-top:12px;">
+              <button class="btn" id="saveReport" type="button">
+                <i class="fas fa-save"></i> Save Report
+              </button>
+              <button class="btn" id="saveAndSync" type="button">
+                <i class="fas fa-cloud-upload-alt"></i> Save & Sync
+              </button>
+              <button class="btn-ghost" id="clearForm" type="button">
+                <i class="fas fa-eraser"></i> Clear
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        <div class="col card">
+          <h3><i class="fas fa-list"></i> Report Status</h3>
+          <div id="reportStats">
+            <div class="flex" style="justify-content: space-between; margin: 8px 0;">
+              <span>Pending Sync:</span>
+              <span id="pendingCount" class="risk-med">0</span>
+            </div>
+            <div class="flex" style="justify-content: space-between; margin: 8px 0;">
+              <span>Synced Today:</span>
+              <span id="syncedCount" class="risk-low">0</span>
+            </div>
+            <div class="flex" style="justify-content: space-between; margin: 8px 0;">
+              <span>Total Reports:</span>
+              <span id="totalReports" class="risk-low">0</span>
+            </div>
+          </div>
+          <button class="btn" id="syncReports">
+            <i class="fas fa-sync-alt"></i> Sync All Reports
+          </button>
+          <div class="small" style="margin-top: 8px;">
+            <i class="fas fa-wifi"></i> Connection Status: <span id="connectionState">Online</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top: 14px;">
+        <h3><i class="fas fa-history"></i> Recent Reports</h3>
+        <div id="localReports"></div>
+      </div>
+    </section>
+
+    <!-- SENSORS -->
+    <section class="card page-transition" id="page-sensors" style="display:none;">
+      <h2><i class="fas fa-microchip"></i> IoT Sensors & Water Quality Monitoring</h2>
+      <small>Real-time water quality monitoring with IoT sensors and manual testing kits</small>
+      
+      <div class="row" style="margin-top:12px;">
+        <div class="col card">
+          <h4><i class="fas fa-broadcast-tower"></i> Live Sensor Feed</h4>
+          <div id="sensorFeedList" style="max-height:300px; overflow:auto;"></div>
+        </div>
+        
+        <div class="col card">
+          <h4><i class="fas fa-cogs"></i> Sensor Controls</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="btn" id="startSim">
+              <i class="fas fa-play"></i> Start Monitoring
+            </button>
+            <button class="btn-ghost" id="stopSim">
+              <i class="fas fa-stop"></i> Stop
+            </button>
+            <button class="btn-ghost" id="fetchCloud">
+              <i class="fas fa-cloud-download-alt"></i> Fetch Data
+            </button>
+            <button class="btn" id="calibrateSensors">
+              <i class="fas fa-adjust"></i> Calibrate
+            </button>
+          </div>
+          
+          <h4><i class="fas fa-vial"></i> Manual Testing Kit</h4>
+          <form id="manualTestForm">
+            <label>Location
+              <select id="testLocation"></select>
+            </label>
+            <label>pH Level
+              <input type="number" id="testPH" step="0.1" min="0" max="14" placeholder="7.0" />
+            </label>
+            <label>Turbidity (NTU)
+              <input type="number" id="testTurbidity" step="0.1" min="0" placeholder="5.0" />
+            </label>
+            <label>Chlorine (mg/L)
+              <input type="number" id="testChlorine" step="0.01" min="0" placeholder="0.5" />
+            </label>
+            <label>Bacteria Test Result
+              <select id="testBacteria">
+                <option value="negative">Negative</option>
+                <option value="positive">Positive</option>
+                <option value="inconclusive">Inconclusive</option>
+              </select>
+            </label>
+            <button class="btn" type="submit">
+              <i class="fas fa-flask"></i> Submit Test Results
+            </button>
+          </form>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top:14px;">
+        <h3><i class="fas fa-chart-area"></i> Water Quality Dashboard</h3>
+        <div id="waterQualityDashboard">
+          <canvas id="waterQualityChart" height="200"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI PREDICTION -->
+    <section class="card page-transition" id="page-prediction" style="display:none;">
+      <h2><i class="fas fa-brain"></i> AI-Powered Outbreak Prediction Engine</h2>
+      <small>Machine learning models analyzing patterns for early outbreak detection</small>
+      
+      <div class="row" style="margin-top:12px;">
+        <div class="col card">
+          <h4><i class="fas fa-robot"></i> Prediction Controls</h4>
+          <div style="margin-bottom:12px;">
+            <button class="btn" id="runPrediction">
+              <i class="fas fa-play-circle"></i> Run AI Analysis
+            </button>
+            <button class="btn-ghost" id="autoPredict">
+              <i class="fas fa-sync-alt"></i> Auto (Every 5 min)
+            </button>
+            <button class="btn-ghost" id="trainModel">
+              <i class="fas fa-graduation-cap"></i> Retrain Model
+            </button>
+          </div>
+          
+          <h4><i class="fas fa-sliders-h"></i> Prediction Parameters</h4>
+          <label>Prediction Horizon
+            <select id="predictionHorizon">
+              <option value="1">1 Day</option>
+              <option value="3">3 Days</option>
+              <option value="7" selected>7 Days</option>
+              <option value="14">14 Days</option>
+            </select>
+          </label>
+          <label>Sensitivity Level
+            <select id="sensitivityLevel">
+              <option value="low">Low (Fewer False Positives)</option>
+              <option value="medium" selected>Medium (Balanced)</option>
+              <option value="high">High (Early Detection)</option>
+            </select>
+          </label>
+        </div>
+        
+        <div class="col card">
+          <h4><i class="fas fa-chart-pie"></i> Model Performance</h4>
+          <div class="row">
+            <div class="col">
+              <small>Model Accuracy</small>
+              <div style="font-size:24px; font-weight:900; color:var(--success);" id="modelAccuracy">94.2%</div>
+            </div>
+            <div class="col">
+              <small>Last Training</small>
+              <div style="font-size:16px; color:var(--muted);" id="lastTraining">2 hours ago</div>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 94%"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top:14px;">
+        <h3><i class="fas fa-search"></i> Prediction Results & Risk Assessment</h3>
+        <div id="predictionResults"></div>
+      </div>
+    </section>
+
+    <!-- ALERT SYSTEM -->
+    <section class="card page-transition" id="page-alerts" style="display:none;">
+      <h2><i class="fas fa-bell"></i> Alert & Notification System</h2>
+      <small>Real-time alerts to health officials and community members</small>
+      
+      <div class="row" style="margin-top:12px;">
+        <div class="col card">
+          <h4><i class="fas fa-plus-circle"></i> Send Alert</h4>
+          <form id="alertForm">
+            <label>Alert Type
+              <select id="alertType">
+                <option value="outbreak">Disease Outbreak</option>
+                <option value="water">Water Contamination</option>
+                <option value="infrastructure">Infrastructure Issue</option>
+                <option value="weather">Weather Warning</option>
+                <option value="general">General Advisory</option>
+              </select>
+            </label>
+            <label>Severity
+              <select id="alertSeverity">
+                <option value="info">Information</option>
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+                <option value="critical">Critical Emergency</option>
+              </select>
+            </label>
+            <label>Target Areas
+              <select id="alertAreas" multiple>
+                <option value="all">All Areas</option>
+              </select>
+            </label>
+            <label>Alert Message
+              <textarea id="alertMessage" rows="4" placeholder="Enter alert message..."></textarea>
+            </label>
+            <label>Alert Recipients
+              <div class="flex" style="flex-wrap: wrap; gap: 10px; margin-top: 5px;">
+                <label style="flex-direction: row; align-items: center; margin: 0;">
+                  <input type="checkbox" id="alertOfficials" checked style="width: auto; margin-right: 5px;">
+                  Health Officials
+                </label>
+                <label style="flex-direction: row; align-items: center; margin: 0;">
+                  <input type="checkbox" id="alertCommunity" checked style="width: auto; margin-right: 5px;">
+                  Community
+                </label>
+                <label style="flex-direction: row; align-items: center; margin: 0;">
+                  <input type="checkbox" id="alertASHA" checked style="width: auto; margin-right: 5px;">
+                  ASHA Workers
+                </label>
+              </div>
+            </label>
+            <button class="btn" type="submit">
+              <i class="fas fa-paper-plane"></i> Send Alert
+            </button>
+          </form>
+        </div>
+        
+        <div class="col card">
+          <h4><i class="fas fa-history"></i> Alert History</h4>
+          <div id="alertHistory" style="max-height: 300px; overflow-y: auto;"></div>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top:14px;">
+        <h4><i class="fas fa-cog"></i> Notification Settings</h4>
+        <div class="row">
+          <div class="col">
+            <h5>Alert Channels</h5>
+            <label style="flex-direction: row; align-items: center;">
+              <input type="checkbox" id="enableSMS" checked style="width: auto; margin-right: 8px;">
+              SMS Notifications
+            </label>
+            <label style="flex-direction: row; align-items: center;">
+              <input type="checkbox" id="enableEmail" checked style="width: auto; margin-right: 8px;">
+              Email Alerts
+            </label>
+            <label style="flex-direction: row; align-items: center;">
+              <input type="checkbox" id="enablePush" checked style="width: auto; margin-right: 8px;">
+              Push Notifications
+            </label>
+            <label style="flex-direction: row; align-items: center;">
+              <input type="checkbox" id="enableSound" checked style="width: auto; margin-right: 8px;">
+              Sound Alerts
+            </label>
+          </div>
+          <div class="col">
+            <h5>Auto-Alert Triggers</h5>
+            <label>Contamination Threshold
+              <input type="range" id="contaminationThreshold" min="0" max="100" value="70" 
+                     oninput="document.getElementById('contThresholdValue').textContent = this.value + '%'">
+              <span id="contThresholdValue">70%</span>
+            </label>
+            <label>Outbreak Risk Threshold
+              <input type="range" id="outbreakThreshold" min="0" max="100" value="80"
+                     oninput="document.getElementById('outbreakThresholdValue').textContent = this.value + '%'">
+              <span id="outbreakThresholdValue">80%</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EDUCATION -->
+    <section class="card page-transition" id="page-education" style="display:none;">
+      <h2><i class="fas fa-graduation-cap"></i> Health Education & Awareness</h2>
+      <small>Multilingual educational content and awareness campaigns</small>
+      
+      <div class="row" style="margin-top:12px;">
+        <div class="col card">
+          <h4><i class="fas fa-hands-wash"></i> Hygiene Guidelines</h4>
+          <div id="hygieneContent">
+            <h5>Proper Handwashing Steps</h5>
+            <ol>
+              <li><i class="fas fa-tint"></i> Wet hands with clean, running water</li>
+              <li><i class="fas fa-soap"></i> Apply soap and lather thoroughly</li>
+              <li><i class="fas fa-clock"></i> Scrub for at least 20 seconds</li>
+              <li><i class="fas fa-water"></i> Rinse with clean water</li>
+              <li><i class="fas fa-paper-towel"></i> Dry with clean towel or air dry</li>
+            </ol>
+            
+            <h5>Water Safety Practices</h5>
+            <ul>
+              <li><i class="fas fa-fire"></i> Boil water for at least 1 minute before drinking</li>
+              <li><i class="fas fa-vial"></i> Use water purification tablets when boiling isn't possible</li>
+              <li><i class="fas fa-bottle-water"></i> Store treated water in clean, covered containers</li>
+              <li><i class="fas fa-ban"></i> Avoid ice unless made from safe water</li>
+            </ul>
+          </div>
+          
+          <button class="btn" id="playAudio" style="margin-top: 10px;">
+            <i class="fas fa-volume-up"></i> Play Audio Guide
+          </button>
+        </div>
+        
+        <div class="col card">
+          <h4><i class="fas fa-language"></i> Multilingual Content</h4>
+          <div>
+            <label>Select Language
+              <select id="eduLanguage">
+                <option value="en">English</option>
+                <option value="as">Assamese (অসমীয়া)</option>
+                <option value="bn">Bengali (বাংলা)</option>
+                <option value="hi">Hindi (हिन्दी)</option>
+                <option value="ne">Nepali (नेपाली)</option>
+              </select>
+            </label>
+            <div id="multilingualContent" style="margin-top: 10px;">
+              <!-- Content will be populated based on language selection -->
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="row" style="margin-top:14px;">
+        <div class="col card">
+          <h4><i class="fas fa-video"></i> Educational Videos</h4>
+          <div class="video-list">
+            <div class="video-item" style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <i class="fas fa-play-circle" style="font-size: 20px; color: var(--accent);"></i>
+              <strong style="margin-left: 10px;">Water Purification Methods</strong>
+              <div class="small" style="margin-left: 30px;">Duration: 3:45 | Available in 5 languages</div>
+            </div>
+            <div class="video-item" style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <i class="fas fa-play-circle" style="font-size: 20px; color: var(--accent);"></i>
+              <strong style="margin-left: 10px;">Recognizing Disease Symptoms</strong>
+              <div class="small" style="margin-left: 30px;">Duration: 5:20 | Available in 5 languages</div>
+            </div>
+            <div class="video-item" style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <i class="fas fa-play-circle" style="font-size: 20px; color: var(--accent);"></i>
+              <strong style="margin-left: 10px;">Community Hygiene Practices</strong>
+              <div class="small" style="margin-left: 30px;">Duration: 4:15 | Available in 5 languages</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col card">
+          <h4><i class="fas fa-download"></i> Downloadable Resources</h4>
+          <div class="resource-list">
+            <div class="resource-item" style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <i class="fas fa-file-pdf" style="color: #ff4444;"></i>
+              <span style="margin-left: 10px;">Water Safety Handbook (PDF)</span>
+              <button class="btn-ghost" style="float: right; padding: 4px 8px;">
+                <i class="fas fa-download"></i>
+              </button>
+            </div>
+            <div class="resource-item" style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <i class="fas fa-file-image" style="color: #44ff44;"></i>
+              <span style="margin-left: 10px;">Hygiene Posters (PNG)</span>
+              <button class="btn-ghost" style="float: right; padding: 4px 8px;">
+                <i class="fas fa-download"></i>
+              </button>
+            </div>
+            <div class="resource-item" style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <i class="fas fa-file-audio" style="color: #4444ff;"></i>
+              <span style="margin-left: 10px;">Audio Guidelines (MP3)</span>
+              <button class="btn-ghost" style="float: right; padding: 4px 8px;">
+                <i class="fas fa-download"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANALYTICS -->
+    <section class="card page-transition" id="page-analytics" style="display:none;">
+      <h2><i class="fas fa-chart-line"></i> Advanced Analytics & Insights</h2>
+      <small>Comprehensive data analysis and trend visualization</small>
+      
+      <div class="row" style="margin-top:12px;">
+        <div class="col card">
+          <h4><i class="fas fa-chart-bar"></i> Disease Trends</h4>
+          <canvas id="diseaseChart" height="200"></canvas>
+        </div>
+        <div class="col card">
+          <h4><i class="fas fa-map"></i> Geographic Analysis</h4>
+          <canvas id="geoChart" height="200"></canvas>
+        </div>
+      </div>
+      
+      <div class="row" style="margin-top:14px;">
+        <div class="col card">
+          <h4><i class="fas fa-calendar-week"></i> Seasonal Patterns</h4>
+          <canvas id="seasonalChart" height="150"></canvas>
+        </div>
+        <div class="col card">
+          <h4><i class="fas fa-exclamation-triangle"></i> Risk Factors</h4>
+          <div id="riskFactors">
+            <div class="flex" style="justify-content: space-between; margin: 8px 0;">
+              <span><i class="fas fa-tint"></i> Water Quality:</span>
+              <span class="risk-high">High Risk</span>
+            </div>
+            <div class="flex" style="justify-content: space-between; margin: 8px 0;">
+              <span><i class="fas fa-cloud-rain"></i> Monsoon Season:</span>
+              <span class="risk-med">Medium Risk</span>
+            </div>
+            <div class="flex" style="justify-content: space-between; margin: 8px 0;">
+              <span><i class="fas fa-users"></i> Population Density:</span>
+              <span class="risk-low">Low Risk</span>
+            </div>
+            <div class="flex" style="justify-content: space-between; margin: 8px 0;">
+              <span><i class="fas fa-home"></i> Sanitation:</span>
+              <span class="risk-med">Medium Risk</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOGS -->
+    <section class="card page-transition" id="page-logs" style="display:none;">
+      <h2><i class="fas fa-clipboard-list"></i> System Logs & Reports</h2>
+      <small>Comprehensive logging and detailed reporting system</small>
+      
+      <div class="row" style="margin-top:12px;">
+        <div class="col card">
+          <h4><i class="fas fa-filter"></i> Filter Options</h4>
+          <label>Date Range
+            <select id="dateRange">
+              <option value="today">Today</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+              <option value="quarter">Last 3 Months</option>
+            </select>
+          </label>
+          <label>Log Type
+            <select id="logType">
+              <option value="all">All Logs</option>
+              <option value="system">System Events</option>
+              <option value="user">User Actions</option>
+              <option value="alerts">Alert History</option>
+              <option value="sensors">Sensor Data</option>
+            </select>
+          </label>
+          <label>Severity
+            <select id="logSeverity">
+              <option value="all">All Levels</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+              <option value="critical">Critical</option>
+            </select>
+          </label>
+          <button class="btn" id="filterLogs">
+            <i class="fas fa-search"></i> Apply Filter
+          </button>
+        </div>
+        
+        <div class="col card">
+          <h4><i class="fas fa-download"></i> Export Options</h4>
+          <div style="margin-bottom: 10px;">
+            <button class="btn" id="exportCSV">
+              <i class="fas fa-file-csv"></i> Export CSV
+            </button>
+            <button class="btn-ghost" id="exportPDF">
+              <i class="fas fa-file-pdf"></i> Export PDF
+            </button>
+            <button class="btn-ghost" id="exportJSON">
+              <i class="fas fa-file-code"></i> Export JSON
+            </button>
+          </div>
+          <div class="small">
+            <i class="fas fa-info-circle"></i> Reports include all filtered data with timestamps and metadata
+          </div>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top:14px;">
+        <h3><i class="fas fa-list"></i> System Logs</h3>
+        <div id="reportsLog" style="max-height: 400px; overflow-y: auto;"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// Enhanced Sample Data
+const VILLAGES = {
+  Tamenglong: {lat:24.99, lng:93.58, officer:'Dr. Singh', contact:'+91 9876543210', population: 15000},
+  Guwahati: {lat:26.1445, lng:91.7362, officer:'Ms. Devi', contact:'+91 9123456780', population: 120000},
+  Imphal: {lat:24.817, lng:93.9368, officer:'Mr. Ranjan', contact:'+91 9988776655', population: 85000},
+  Aizawl: {lat:23.7271, lng:92.7176, officer:'Dr. Lalthansanga', contact:'+91 9876501234', population: 45000},
+  Shillong: {lat:25.57, lng:91.88, officer:'Ms. Mary', contact:'+91 9871234567', population: 75000},
+  Agartala: {lat:23.83, lng:91.28, officer:'Mr. Das', contact:'+91 9123456789', population: 65000}
+};
+
+let SAMPLE_SENSORS = [
+  {v:'Tamenglong', level:75, turb:60, ph:6.8, contamination:80, chlorine:0.2, bacteria:'positive'},
+  {v:'Guwahati', level:60, turb:30, ph:7.1, contamination:35, chlorine:0.5, bacteria:'negative'},
+  {v:'Imphal', level:55, turb:50, ph:6.5, contamination:50, chlorine:0.3, bacteria:'positive'},
+  {v:'Aizawl', level:70, turb:40, ph:7.3, contamination:25, chlorine:0.7, bacteria:'negative'},
+  {v:'Shillong', level:50, turb:65, ph:6.4, contamination:70, chlorine:0.1, bacteria:'positive'},
+  {v:'Agartala', level:65, turb:20, ph:7.0, contamination:15, chlorine:0.8, bacteria:'negative'}
+];
+
+const SAMPLE_REPORTS = [
+  {id:'r1', village:'Tamenglong', reporter:'ASHA Lily', contact:'+91 700000001', type:'symptom', severity:'high', notes:'Multiple children showing diarrhea symptoms', ts:new Date(Date.now()-5000*60000).toISOString()},
+  {id:'r2', village:'Guwahati', reporter:'Volunteer Anita', contact:'+91 700000002', type:'water', severity:'medium', notes:'Cloudy well water observed', ts:new Date(Date.now()-4000*60000).toISOString()},
+  {id:'r3', village:'Imphal', reporter:'Dr. Kumar', contact:'+91 700000003', type:'outbreak', severity:'critical', notes:'Suspected cholera outbreak - 15 cases', ts:new Date(Date.now()-2000*60000).toISOString()}
+];
+
+// Global variables
+let isSimulationRunning = false;
+let simulationInterval = null;
+let predictionInterval = null;
+let charts = {};
+let currentLanguage = 'en';
+let notificationSound = null;
+
+// Utility Functions
+function loadSensors() {
+  let s = localStorage.getItem('sih_sensors');
+  if(!s) localStorage.setItem('sih_sensors', JSON.stringify(SAMPLE_SENSORS));
+  return JSON.parse(localStorage.getItem('sih_sensors'));
+}
+
+function saveSensors(arr) {
+  localStorage.setItem('sih_sensors', JSON.stringify(arr));
+}
+
+function loadReports() {
+  let r = localStorage.getItem('sih_reports');
+  if(!r) localStorage.setItem('sih_reports', JSON.stringify(SAMPLE_REPORTS));
+  return JSON.parse(localStorage.getItem('sih_reports'));
+}
+
+function saveReports(arr) {
+  localStorage.setItem('sih_reports', JSON.stringify(arr));
+}
+
+function showNotification(message, type = 'info', duration = 5000) {
+  const container = document.getElementById('notificationContainer');
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center;">
+      <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'danger' ? 'fa-exclamation-triangle' : 'fa-info-circle'}" style="margin-right: 10px;"></i>
+      <div style="flex: 1;">${message}</div>
+      <button class="close-btn" onclick="this.parentElement.parentElement.remove()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `;
+  
+  container.appendChild(notification);
+  
+  // Auto remove after duration
+  setTimeout(() => {
+    if (notification.parentElement) {
+      notification.remove();
+    }
+  }, duration);
+  
+  // Play sound for critical alerts
+  if (type === 'danger' || type === 'warning') {
+    playAlertSound();
+  }
+}
+
+function playAlertSound() {
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance('Alert! New health notification.');
+    utterance.rate = 1.2;
+    utterance.pitch = 1.1;
+    speechSynthesis.speak(utterance);
+  }
+}
+
+function updateSyncTime() {
+  document.getElementById('syncTime').textContent = new Date().toLocaleTimeString();
+}
+
+function updateStats() {
+  const sensors = loadSensors();
+  const reports = loadReports();
+  
+  // Calculate average contamination
+  const avgContamination = sensors.reduce((sum, s) => sum + s.contamination, 0) / sensors.length;
+  document.getElementById('avgCont').textContent = Math.round(avgContamination) + '%';
+  document.getElementById('contaminationProgress').style.width = avgContamination + '%';
+  
+  // Count hotspots (contamination > 60%)
+  const hotspots = sensors.filter(s => s.contamination > 60).length;
+  document.getElementById('hotspotCount').textContent = hotspots;
+  document.getElementById('hotspotsProgress').style.width = (hotspots / sensors.length * 100) + '%';
+  
+  // Count reports in last 24 hours
+  const recentReports = reports.filter(r => 
+    new Date(r.ts) > new Date(Date.now() - 24*60*60*1000)
+  ).length;
+  document.getElementById('reportsCount').textContent = recentReports;
+  document.getElementById('reportsProgress').style.width = Math.min(recentReports * 10, 100) + '%';
+  
+  // Calculate people at risk
+  const affectedPeople = Object.keys(VILLAGES).reduce((total, village) => {
+    const sensor = sensors.find(s => s.v === village);
+    if (sensor && sensor.contamination > 50) {
+      return total + Math.round(VILLAGES[village].population * (sensor.contamination / 100) * 0.3);
+    }
+    return total;
+  }, 0);
+  document.getElementById('affectedCount').textContent = affectedPeople.toLocaleString();
+  document.getElementById('riskProgress').style.width = Math.min(affectedPeople / 10000 * 100, 100) + '%';
+}
+
+function generateAlerts() {
+  const sensors = loadSensors();
+  const reports = loadReports();
+  const alertsPanel = document.getElementById('alertsPanel');
+  
+  let alerts = [];
+  
+  // Check for high contamination
+  sensors.forEach(s => {
+    if (s.contamination > 70) {
+      alerts.push({
+        type: 'high',
+        icon: 'fa-exclamation-triangle',
+        message: `Critical contamination in ${s.v} (${s.contamination}%)`,
+        action: `Contact: ${VILLAGES[s.v].contact}`,
+        time: 'Now'
+      });
+    } else if (s.contamination > 40) {
+      alerts.push({
+        type: 'med',
+        icon: 'fa-exclamation-circle',
+        message: `Elevated contamination in ${s.v} (${s.contamination}%)`,
+        action: `Monitor closely`,
+        time: '5 min ago'
+      });
+    }
+  });
+  
+  // Check for critical reports
+  const criticalReports = reports.filter(r => r.severity === 'critical' || r.severity === 'high');
+  criticalReports.slice(0, 3).forEach(r => {
+    alerts.push({
+      type: r.severity === 'critical' ? 'high' : 'med',
+      icon: 'fa-user-md',
+      message: `${r.type === 'outbreak' ? 'Disease outbreak' : 'Health report'} in ${r.village}`,
+      action: r.notes.substring(0, 50) + '...',
+      time: new Date(r.ts).toLocaleString()
+    });
+  });
+  
+  if (alerts.length === 0) {
+    alertsPanel.innerHTML = '<div class="alert low"><i class="fas fa-check-circle"></i> No active alerts - All systems normal</div>';
+  } else {
+    alertsPanel.innerHTML = alerts.map(alert => `
+      <div class="alert ${alert.type}">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; margin-bottom: 5px;">
+              <i class="fas ${alert.icon}" style="margin-right: 10px;"></i>
+              <strong>${alert.message}</strong>
+            </div>
+            <div class="small">${alert.action}</div>
+          </div>
+          <div class="small" style="text-align: right;">
+            ${alert.time}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  // Update emergency contacts
+  const contactsPanel = document.getElementById('emergencyContacts');
+  contactsPanel.innerHTML = Object.entries(VILLAGES).map(([village, data]) => `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin: 5px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+      <div>
+        <strong>${village}</strong><br>
+        <small>${data.officer}</small>
+      </div>
+      <a href="tel:${data.contact}" class="btn-ghost" style="padding: 4px 8px;">
+        <i class="fas fa-phone"></i> Call
+      </a>
+    </div>
+  `).join('');
+}
+
+// Leaflet Map Setup
+const map = L.map('map').setView([25.5,92.5],7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ 
+  maxZoom:19,
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+const markerClusterGrp = L.markerClusterGroup({
+  iconCreateFunction: function(cluster) {
+    const count = cluster.getChildCount();
+    let className = 'marker-cluster-small';
+    if (count > 10) className = 'marker-cluster-medium';
+    if (count > 20) className = 'marker-cluster-large';
+    
+    return L.divIcon({
+      html: '<div><span>' + count + '</span></div>',
+      className: 'marker-cluster ' + className,
+      iconSize: L.point(40, 40)
+    });
+  }
+});
+map.addLayer(markerClusterGrp);
+
+const heatmapLayer = L.heatLayer([], { 
+  radius: 25, 
+  blur: 15, 
+  maxZoom: 17,
+  gradient: {
+    0.0: '#0099cc',
+    0.5: '#ffae42', 
+    1.0: '#ff4d4d'
+  }
+}).addTo(map);
+
+let showHeatmap = true;
+
+function renderMapAndHeat() {
+  markerClusterGrp.clearLayers();
+  const sensors = loadSensors();
+  const heatData = [];
+
+  sensors.forEach(s => {
+    const village = VILLAGES[s.v];
+    if (!village) return;
+    
+    const latlng = [village.lat, village.lng];
+    const color = s.contamination > 70 ? '#ff4d4d' : s.contamination > 40 ? '#ffae42' : '#5fe9a3';
+    
+    const markerIcon = L.divIcon({
+      className: 'custom-div-icon',
+      html: `
+        <div style="
+          width: 24px; 
+          height: 24px; 
+          border-radius: 50%; 
+          background: ${color}; 
+          border: 3px solid #fff; 
+          box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          font-weight: bold;
+          font-size: 10px;
+        ">
+          ${Math.round(s.contamination)}
+        </div>
+      `,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+    
+    const popupContent = `
+      <div style="min-width: 200px;">
+        <h4 style="margin: 0 0 8px 0; color: #333;">${s.v}</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+          <div><strong>Contamination:</strong> <span style="color: ${color}">${s.contamination}%</span></div>
+          <div><strong>pH Level:</strong> ${s.ph}</div>
+          <div><strong>Turbidity:</strong> ${s.turb} NTU</div>
+          <div><strong>Chlorine:</strong> ${s.chlorine} mg/L</div>
+          <div><strong>Bacteria:</strong> <span style="color: ${s.bacteria === 'positive' ? '#ff4d4d' : '#5fe9a3'}">${s.bacteria}</span></div>
+          <div><strong>Water Level:</strong> ${s.level}%</div>
+        </div>
+        <hr style="margin: 8px 0;">
+        <div><strong>Health Officer:</strong> ${village.officer}</div>
+        <div><strong>Contact:</strong> <a href="tel:${village.contact}">${village.contact}</a></div>
+        <div><strong>Population:</strong> ${village.population.toLocaleString()}</div>
+        <div style="margin-top: 8px;">
+          <button onclick="sendQuickAlert('${s.v}')" class="btn" style="font-size: 12px; padding: 4px 8px;">
+            Send Alert
+          </button>
+        </div>
+      </div>
+    `;
+    
+    const marker = L.marker(latlng, {icon: markerIcon})
+      .bindPopup(popupContent, {maxWidth: 300});
+    
+    markerClusterGrp.addLayer(marker);
+    heatData.push([latlng[0], latlng[1], s.contamination / 100]);
+  });
+  
+  heatmapLayer.setLatLngs(heatData);
+  updateSyncTime();
+}
+
+function sendQuickAlert(village) {
+  showNotification(`Emergency alert sent for ${village}`, 'success');
+  // Here you would implement the actual alert sending logic
+}
+
+// Populate village select options
+function populateVillageSelects() {
+  const selects = ['repVillage', 'testLocation', 'alertAreas'];
+  selects.forEach(selectId => {
+    const select = document.getElementById(selectId);
+    if (select) {
+      // Clear existing options except for "all" in alertAreas
+      if (selectId === 'alertAreas') {
+        // Keep the "All Areas" option
+        const allOption = select.querySelector('option[value="all"]');
+        select.innerHTML = '';
+        if (allOption) select.appendChild(allOption);
+      } else {
+        select.innerHTML = '';
+      }
+      
+      Object.keys(VILLAGES).forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+      });
+    }
+  });
+}
+
+// Report handling
+function renderLocalReports() {
+  const container = document.getElementById('localReports');
+  const reports = loadReports().slice(-10); // Show last 10 reports
+  
+  if(reports.length === 0){
+    container.innerHTML = "<p class='small'><i class='fas fa-info-circle'></i> No reports yet</p>";
+    return;
+  }
+  
+  container.innerHTML = reports.slice().reverse().map(r => {
+    const severityColor = {
+      critical: '#ff4d4d',
+      high: '#ff6b4d', 
+      medium: '#ffae42',
+      low: '#5fe9a3'
+    }[r.severity] || '#9aa4b2';
+    
+    return `
+      <div style="
+        background: rgba(255,255,255,0.05); 
+        padding: 12px; 
+        border-radius: 8px; 
+        margin-bottom: 8px;
+        border-left: 4px solid ${severityColor};
+        transition: all 0.3s ease;
+      " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div>
+            <strong style="color: ${severityColor};">${r.village}</strong> 
+            <span class="chip" style="margin-left: 8px; background: ${severityColor}22; color: ${severityColor};">
+              ${r.type}
+            </span>
+            <span class="chip" style="margin-left: 4px;">
+              ${r.severity}
+            </span>
+          </div>
+          <small style="color: var(--muted);">${new Date(r.ts).toLocaleString()}</small>
+        </div>
+        <div style="margin-bottom: 8px;">
+          <i class="fas fa-user"></i> Reporter: ${r.reporter} | 
+          <i class="fas fa-phone"></i> <a href="tel:${r.contact}">${r.contact}</a>
+        </div>
+        <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; font-size: 13px;">
+          ${r.notes}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Update report stats
+  updateReportStats();
+}
+
+function updateReportStats() {
+  const reports = loadReports();
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  
+  const todayReports = reports.filter(r => new Date(r.ts) >= today).length;
+  const pendingSync = reports.filter(r => !r.synced).length;
+  
+  if (document.getElementById('pendingCount')) {
+    document.getElementById('pendingCount').textContent = pendingSync;
+    document.getElementById('syncedCount').textContent = reports.filter(r => r.synced).length;
+    document.getElementById('totalReports').textContent = reports.length;
+  }
+}
+
+// Sensor simulation
+function startSensorSimulation() {
+  if (isSimulationRunning) return;
+  
+  isSimulationRunning = true;
+  document.getElementById('startSim').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running';
+  
+  simulationInterval = setInterval(() => {
+    let sensors = loadSensors();
+    
+    sensors = sensors.map(s => ({
+      ...s,
+      contamination: Math.max(0, Math.min(100, s.contamination + (Math.random() - 0.5) * 10)),
+      ph: Math.max(0, Math.min(14, s.ph + (Math.random() - 0.5) * 0.2)),
+      turb: Math.max(0, s.turb + (Math.random() - 0.5) * 5),
+      level: Math.max(0, Math.min(100, s.level + (Math.random() - 0.5) * 5)),
+      chlorine: Math.max(0, s.chlorine + (Math.random() - 0.5) * 0.1),
+      bacteria: Math.random() > 0.8 ? (s.bacteria === 'positive' ? 'negative' : 'positive') : s.bacteria
+    }));
+    
+    saveSensors(sensors);
+    renderMapAndHeat();
+    updateStats();
+    generateAlerts();
+    updateSensorFeed(sensors);
+    updateCharts();
+    
+    // Trigger notifications for critical contamination
+    sensors.forEach(s => {
+      if (s.contamination > 85) {
+        showNotification(
+          `CRITICAL: Contamination level ${s.contamination}% in ${s.v}!`, 
+          'danger', 
+          8000
+        );
+      }
+    });
+    
+  }, 3000);
+}
+
+function stopSensorSimulation() {
+  if (!isSimulationRunning) return;
+  
+  isSimulationRunning = false;
+  clearInterval(simulationInterval);
+  document.getElementById('startSim').innerHTML = '<i class="fas fa-play"></i> Start Monitoring';
+  showNotification('Sensor monitoring stopped', 'info');
+}
+
+function updateSensorFeed(sensors) {
+  const feedContainer = document.getElementById('sensorFeedList');
+  if (!feedContainer) return;
+  
+  const currentTime = new Date().toLocaleTimeString();
+  
+  const feedHTML = sensors.map(s => {
+    const status = s.contamination > 70 ? 'critical' : s.contamination > 40 ? 'warning' : 'normal';
+    const statusColor = status === 'critical' ? '#ff4d4d' : status === 'warning' ? '#ffae42' : '#5fe9a3';
+    
+    return `
+      <div style="
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        padding: 8px; 
+        margin: 4px 0; 
+        background: rgba(255,255,255,0.05); 
+        border-radius: 6px;
+        border-left: 3px solid ${statusColor};
+      ">
+        <div>
+          <strong>${s.v}</strong><br>
+          <small>Cont: ${s.contamination}% | pH: ${s.ph} | Turb: ${s.turb}</small>
+        </div>
+        <div style="text-align: right;">
+          <div class="chip" style="background: ${statusColor}22; color: ${statusColor};">
+            ${status.toUpperCase()}
+          </div>
+          <div class="small">${currentTime}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  feedContainer.innerHTML = feedHTML;
+}
+
+// Chart initialization and updates
+function initializeCharts() {
+  const sensors = loadSensors();
+  
+  // Trend Chart
+  const ctxTrend = document.getElementById('trendChart').getContext('2d');
+  charts.trendChart = new Chart(ctxTrend, {
+    type: 'line',
+    data: {
+      labels: sensors.map(s => s.v),
+      datasets: [
+        {
+          label: 'Contamination %',
+          data: sensors.map(s => s.contamination),
+          borderColor: '#ff4d4d',
+          backgroundColor: 'rgba(255,77,77,0.1)',
+          fill: true,
+          tension: 0.4
+        },
+        {
+          label: 'pH Level',
+          data: sensors.map(s => s.ph),
+          borderColor: '#1fb6ff',
+          backgroundColor: 'rgba(31,182,255,0.1)',
+          fill: false,
+          tension: 0.4,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#e6eef6' }
+        }
+      },
+      scales: {
+        x: { 
+          ticks: { color: '#9aa4b2' },
+          grid: { color: 'rgba(255,255,255,0.1)' }
+        },
+        y: {
+          ticks: { color: '#9aa4b2' },
+          grid: { color: 'rgba(255,255,255,0.1)' },
+          title: {
+            display: true,
+            text: 'Contamination %',
+            color: '#9aa4b2'
+          }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          ticks: { color: '#9aa4b2' },
+          grid: { drawOnChartArea: false },
+          title: {
+            display: true,
+            text: 'pH Level',
+            color: '#9aa4b2'
+          }
+        }
+      }
+    }
+  });
+  
+  // Bar Chart
+  const ctxBar = document.getElementById('barComparison').getContext('2d');
+  charts.barChart = new Chart(ctxBar, {
+    type: 'bar',
+    data: {
+      labels: sensors.map(s => s.v),
+      datasets: [
+        {
+          label: 'Turbidity',
+          data: sensors.map(s => s.turb),
+          backgroundColor: 'rgba(255,174,66,0.8)',
+          borderColor: '#ffae42',
+          borderWidth: 1
+        },
+        {
+          label: 'Water Level',
+          data: sensors.map(s => s.level || 0),
+          backgroundColor: 'rgba(95,233,163,0.8)',
+          borderColor: '#5fe9a3',
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#e6eef6' }
+        }
+      },
+      scales: {
+        x: { 
+          ticks: { color: '#9aa4b2' },
+          grid: { color: 'rgba(255,255,255,0.1)' }
+        },
+        y: {
+          ticks: { color: '#9aa4b2' },
+          grid: { color: 'rgba(255,255,255,0.1)' }
+        }
+      }
+    }
+  });
+  
+  // Water Quality Chart (for sensors page)
+  const ctxWater = document.getElementById('waterQualityChart')?.getContext('2d');
+  if (ctxWater) {
+    charts.waterChart = new Chart(ctxWater, {
+      type: 'radar',
+      data: {
+        labels: ['pH', 'Turbidity', 'Chlorine', 'Contamination', 'Water Level'],
+        datasets: sensors.slice(0, 3).map((s, i) => ({
+          label: s.v,
+          data: [
+            s.ph * 10, // Scale pH to 0-140
+            s.turb,
+            s.chlorine * 100, // Scale chlorine to 0-100
+            s.contamination,
+            s.level
+          ],
+          borderColor: ['#ff4d4d', '#1fb6ff', '#5fe9a3'][i],
+          backgroundColor: [`rgba(255,77,77,0.2)`, `rgba(31,182,255,0.2)`, `rgba(95,233,163,0.2)`][i],
+          pointBackgroundColor: ['#ff4d4d', '#1fb6ff', '#5fe9a3'][i]
+        }))
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#e6eef6' }
+          }
+        },
+        scales: {
+          r: {
+            ticks: { color: '#9aa4b2' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          }
+        }
+      }
+    });
+  }
+  
+  // Analytics Charts
+  const ctxDisease = document.getElementById('diseaseChart')?.getContext('2d');
+  if (ctxDisease) {
+    charts.diseaseChart = new Chart(ctxDisease, {
+      type: 'doughnut',
+      data: {
+        labels: ['Diarrhea', 'Cholera', 'Typhoid', 'Hepatitis A', 'Others'],
+        datasets: [{
+          data: [45, 20, 15, 12, 8],
+          backgroundColor: ['#ff4d4d', '#ff6b4d', '#ffae42', '#1fb6ff', '#5fe9a3'],
+          borderColor: ['#cc3333', '#cc5533', '#cc8822', '#0099cc', '#4cc080'],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#e6eef6' }
+          }
+        }
+      }
+    });
+  }
+  
+  const ctxGeo = document.getElementById('geoChart')?.getContext('2d');
+  if (ctxGeo) {
+    charts.geoChart = new Chart(ctxGeo, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(VILLAGES),
+        datasets: [{
+          label: 'Cases per 1000 people',
+          data: Object.values(VILLAGES).map(() => Math.random() * 20 + 5),
+          backgroundColor: 'rgba(31,182,255,0.8)',
+          borderColor: '#1fb6ff',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#e6eef6' }
+          }
+        },
+        scales: {
+          x: { 
+            ticks: { color: '#9aa4b2' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          },
+          y: {
+            ticks: { color: '#9aa4b2' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          }
+        }
+      }
+    });
+  }
+  
+  const ctxSeasonal = document.getElementById('seasonalChart')?.getContext('2d');
+  if (ctxSeasonal) {
+    charts.seasonalChart = new Chart(ctxSeasonal, {
+      type: 'line',
+      data: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        datasets: [{
+          label: 'Disease Incidents',
+          data: [12, 15, 25, 35, 55, 75, 95, 85, 65, 45, 25, 15],
+          borderColor: '#ff4d4d',
+          backgroundColor: 'rgba(255,77,77,0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#e6eef6' }
+          }
+        },
+        scales: {
+          x: { 
+            ticks: { color: '#9aa4b2' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          },
+          y: {
+            ticks: { color: '#9aa4b2' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          }
+        }
+      }
+    });
+  }
+}
+
+function updateCharts() {
+  const sensors = loadSensors();
+  
+  if (charts.trendChart) {
+    charts.trendChart.data.datasets[0].data = sensors.map(s => s.contamination);
+    charts.trendChart.data.datasets[1].data = sensors.map(s => s.ph);
+    charts.trendChart.update('none'); // No animation for performance
+  }
+  
+  if (charts.barChart) {
+    charts.barChart.data.datasets[0].data = sensors.map(s => s.turb);
+    charts.barChart.data.datasets[1].data = sensors.map(s => s.level || 0);
+    charts.barChart.update('none');
+  }
+}
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', function() {
+  populateVillageSelects();
+  renderMapAndHeat();
+  renderLocalReports();
+  updateStats();
+  generateAlerts();
+  initializeCharts();
+  updateSyncTime();
+  
+  // Start real-time updates
+  setInterval(() => {
+    updateSyncTime();
+    if (isSimulationRunning) {
+      updateStats();
+      generateAlerts();
+    }
+  }, 5000);
+});
+
+// Report form submission
+document.getElementById('saveReport').addEventListener('click', () => {
+  const form = document.getElementById('reportForm');
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+  
+  const newReport = {
+    id: 'r' + Date.now(),
+    village: document.getElementById('repVillage').value,
+    reporter: document.getElementById('repName').value || 'Anonymous',
+    contact: document.getElementById('repContact').value || 'N/A',
+    type: document.getElementById('repType').value,
+    severity: document.getElementById('repSeverity').value,
+    notes: document.getElementById('repNotes').value || '',
+    ts: new Date().toISOString(),
+    synced: false
+  };
+  
+  let reports = loadReports();
+  reports.push(newReport);
+  saveReports(reports);
+  
+  showNotification('Report saved successfully!', 'success');
+  renderLocalReports();
+  
+  // Clear form
+  form.reset();
+});
+
+document.getElementById('saveAndSync').addEventListener('click', () => {
+  // First save the report
+  document.getElementById('saveReport').click();
+  
+  // Then sync (simulate sync process)
+  setTimeout(() => {
+    let reports = loadReports();
+    reports = reports.map(r => ({...r, synced: true}));
+    saveReports(reports);
+    showNotification('Report saved and synced to cloud!', 'success');
+    renderLocalReports();
+  }, 1000);
+});
+
+document.getElementById('clearForm').addEventListener('click', () => {
+  document.getElementById('reportForm').reset();
+});
+
+document.getElementById('syncReports').addEventListener('click', () => {
+  const reports = loadReports();
+  const unsyncedCount = reports.filter(r => !r.synced).length;
+  
+  if (unsyncedCount === 0) {
+    showNotification('All reports are already synced!', 'info');
+    return;
+  }
+  
+  // Simulate sync process
+  showNotification('Syncing reports to cloud...', 'info');
+  
+  setTimeout(() => {
+    const updatedReports = reports.map(r => ({...r, synced: true}));
+    saveReports(updatedReports);
+    showNotification(`Successfully synced ${unsyncedCount} reports!`, 'success');
+    renderLocalReports();
+  }, 2000);
+});
+
+// Manual water test form
+document.getElementById('manualTestForm')?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  
+  const location = document.getElementById('testLocation').value;
+  const ph = parseFloat(document.getElementById('testPH').value);
+  const turbidity = parseFloat(document.getElementById('testTurbidity').value);
+  const chlorine = parseFloat(document.getElementById('testChlorine').value);
+  const bacteria = document.getElementById('testBacteria').value;
+  
+  // Calculate contamination based on values
+  let contamination = 0;
+  if (ph < 6.5 || ph > 8.5) contamination += 20;
+  if (turbidity > 10) contamination += 25;
+  if (chlorine < 0.2) contamination += 15;
+  if (bacteria === 'positive') contamination += 40;
+  
+  // Update sensor data
+  let sensors = loadSensors();
+  const sensorIndex = sensors.findIndex(s => s.v === location);
+  if (sensorIndex !== -1) {
+    sensors[sensorIndex] = {
+      ...sensors[sensorIndex],
+      ph: ph || sensors[sensorIndex].ph,
+      turb: turbidity || sensors[sensorIndex].turb,
+      chlorine: chlorine || sensors[sensorIndex].chlorine,
+      bacteria: bacteria,
+      contamination: Math.min(100, contamination),
+      lastManualTest: new Date().toISOString()
+    };
+    
+    saveSensors(sensors);
+    renderMapAndHeat();
+    updateStats();
+    updateCharts();
+    
+    showNotification(`Manual test results recorded for ${location}`, 'success');
+    document.getElementById('manualTestForm').reset();
+  }
+});
+
+// Sensor controls
+document.getElementById('startSim').addEventListener('click', startSensorSimulation);
+document.getElementById('stopSim').addEventListener('click', stopSensorSimulation);
+
+document.getElementById('fetchCloud').addEventListener('click', () => {
+  showNotification('Fetching latest sensor data...', 'info');
+  // Simulate cloud fetch
+  setTimeout(() => {
+    renderMapAndHeat();
+    updateStats();
+    updateCharts();
+    showNotification('Sensor data updated from cloud', 'success');
+  }, 1500);
+});
+
+document.getElementById('calibrateSensors').addEventListener('click', () => {
+  showNotification('Calibrating sensors...', 'info');
+  // Simulate calibration process
+  setTimeout(() => {
+    showNotification('All sensors calibrated successfully', 'success');
+  }, 3000);
+});
+
+// Prediction controls
+document.getElementById('runPrediction')?.addEventListener('click', () => {
+  const predictionResults = document.getElementById('predictionResults');
+  predictionResults.innerHTML = '<div class="loading"></div> Running AI prediction analysis...';
+  
+  setTimeout(() => {
+    const sensors = loadSensors();
+    const reports = loadReports();
+    
+    // Simple prediction logic
+    let predictions = [];
+    
+    sensors.forEach(s => {
+      let riskScore = 0;
+      if (s.contamination > 60) riskScore += 40;
+      if (s.ph < 6.5 || s.ph > 8.5) riskScore += 20;
+      if (s.bacteria === 'positive') riskScore += 30;
+      if (s.turb > 50) riskScore += 10;
+      
+      const riskLevel = riskScore > 70 ? 'high' : riskScore > 40 ? 'medium' : 'low';
+      const riskColor = riskLevel === 'high' ? 'var(--danger)' : riskLevel === 'medium' ? 'var(--warning)' : 'var(--success)';
+      
+      predictions.push({
+        village: s.v,
+        risk: riskLevel,
+        score: riskScore,
+        color: riskColor,
+        factors: [
+          s.contamination > 60 ? 'High contamination' : null,
+          s.ph < 6.5 || s.ph > 8.5 ? 'pH imbalance' : null,
+          s.bacteria === 'positive' ? 'Bacterial contamination' : null,
+          s.turb > 50 ? 'High turbidity' : null
+        ].filter(Boolean)
+      });
+    });
+    
+    predictions.sort((a, b) => b.score - a.score);
+    
+    predictionResults.innerHTML = `
+      <div style="margin-bottom: 16px;">
+        <h4><i class="fas fa-chart-line"></i> Outbreak Risk Prediction</h4>
+        <div class="small">Analysis based on current water quality data and historical patterns</div>
+      </div>
+      ${predictions.map(p => `
+        <div class="alert ${p.risk}" style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                <strong style="margin-right: 10px;">${p.village}</strong>
+                <div class="chip" style="background: ${p.color}22; color: ${p.color};">
+                  ${p.risk.toUpperCase()} RISK (${p.score}%)
+                </div>
+              </div>
+              <div class="small">
+                Risk factors: ${p.factors.length > 0 ? p.factors.join(', ') : 'None identified'}
+              </div>
+              <div class="progress-bar" style="margin-top: 8px;">
+                <div class="progress-fill" style="width: ${p.score}%; background: ${p.color};"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+      <div class="small" style="margin-top: 16px; text-align: center; color: var(--muted);">
+        <i class="fas fa-info-circle"></i> Predictions updated every 5 minutes using machine learning algorithms
+      </div>
+    `;
+    
+    // Send alerts for high-risk areas
+    predictions.filter(p => p.risk === 'high').forEach(p => {
+      showNotification(`HIGH RISK: Potential outbreak predicted in ${p.village}`, 'danger', 10000);
+    });
+    
+  }, 2000);
+});
+
+document.getElementById('autoPredict')?.addEventListener('click', () => {
+  if (predictionInterval) {
+    clearInterval(predictionInterval);
+    predictionInterval = null;
+    document.getElementById('autoPredict').innerHTML = '<i class="fas fa-sync-alt"></i> Auto (Every 5 min)';
+    showNotification('Auto-prediction disabled', 'info');
+  } else {
+    predictionInterval = setInterval(() => {
+      document.getElementById('runPrediction').click();
+    }, 300000); // 5 minutes
+    document.getElementById('autoPredict').innerHTML = '<i class="fas fa-stop"></i> Stop Auto';
+    showNotification('Auto-prediction enabled (every 5 minutes)', 'success');
+  }
+});
+
+document.getElementById('trainModel')?.addEventListener('click', () => {
+  showNotification('Retraining AI model with latest data...', 'info');
+  setTimeout(() => {
+    document.getElementById('modelAccuracy').textContent = (Math.random() * 5 + 95).toFixed(1) + '%';
+    document.getElementById('lastTraining').textContent = 'Just now';
+    showNotification('AI model retrained successfully! Accuracy improved.', 'success');
+  }, 5000);
+});
+
+// Alert system
+document.getElementById('alertForm')?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  
+  const alertType = document.getElementById('alertType').value;
+  const severity = document.getElementById('alertSeverity').value;
+  const message = document.getElementById('alertMessage').value;
+  const areas = Array.from(document.getElementById('alertAreas').selectedOptions).map(opt => opt.value);
+  
+  const recipients = [];
+  if (document.getElementById('alertOfficials').checked) recipients.push('Health Officials');
+  if (document.getElementById('alertCommunity').checked) recipients.push('Community Members');
+  if (document.getElementById('alertASHA').checked) recipients.push('ASHA Workers');
+  
+  // Add to alert history
+  const alertHistory = JSON.parse(localStorage.getItem('alertHistory') || '[]');
+  alertHistory.push({
+    id: Date.now(),
+    type: alertType,
+    severity,
+    message,
+    areas,
+    recipients,
+    timestamp: new Date().toISOString(),
+    status: 'sent'
+  });
+  localStorage.setItem('alertHistory', JSON.stringify(alertHistory));
+  
+  // Show success notification
+  const severityColor = {
+    critical: 'danger',
+    high: 'danger', 
+    medium: 'warning',
+    low: 'success',
+    info: 'info'
+  }[severity];
+  
+  showNotification(`${severity.toUpperCase()} alert sent to ${recipients.join(', ')}`, severityColor);
+  
+  // Clear form
+  e.target.reset();
+  updateAlertHistory();
+});
+
+function updateAlertHistory() {
+  const alertHistory = JSON.parse(localStorage.getItem('alertHistory') || '[]');
+  const container = document.getElementById('alertHistory');
+  
+  if (!container) return;
+  
+  if (alertHistory.length === 0) {
+    container.innerHTML = '<div class="small">No alerts sent yet</div>';
+    return;
+  }
+  
+  container.innerHTML = alertHistory.slice(-10).reverse().map(alert => {
+    const severityColor = {
+      critical: '#ff4d4d',
+      high: '#ff6b4d', 
+      medium: '#ffae42',
+      low: '#5fe9a3',
+      info: '#1fb6ff'
+    }[alert.severity];
+    
+    return `
+      <div style="
+        padding: 12px; 
+        margin-bottom: 8px; 
+        background: rgba(255,255,255,0.05); 
+        border-radius: 8px;
+        border-left: 4px solid ${severityColor};
+      ">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div>
+            <strong style="color: ${severityColor};">${alert.type.toUpperCase()}</strong>
+            <span class="chip" style="margin-left: 8px; background: ${severityColor}22; color: ${severityColor};">
+              ${alert.severity}
+            </span>
+          </div>
+          <small>${new Date(alert.timestamp).toLocaleString()}</small>
+        </div>
+        <div style="margin-bottom: 8px; font-size: 13px;">
+          ${alert.message}
+        </div>
+        <div class="small">
+          <i class="fas fa-map-marker-alt"></i> Areas: ${alert.areas.join(', ')} | 
+          <i class="fas fa-users"></i> Recipients: ${alert.recipients.join(', ')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Emergency alert button
+document.getElementById('emergencyAlert').addEventListener('click', () => {
+  const message = 'EMERGENCY ALERT: Immediate health intervention required. Please check the dashboard for details.';
+  
+  // Show confirmation
+  if (confirm('Send emergency alert to all health officials and ASHA workers?')) {
+    showNotification('EMERGENCY ALERT SENT', 'danger', 10000);
+    
+    // Add to alert history
+    const alertHistory = JSON.parse(localStorage.getItem('alertHistory') || '[]');
+    alertHistory.push({
+      id: Date.now(),
+      type: 'emergency',
+      severity: 'critical',
+      message,
+      areas: ['all'],
+      recipients: ['Health Officials', 'ASHA Workers', 'Emergency Services'],
+      timestamp: new Date().toISOString(),
+      status: 'sent'
+    });
+    localStorage.setItem('alertHistory', JSON.stringify(alertHistory));
+    
+    updateAlertHistory();
+  }
+});
+
+// Language toggle
+document.getElementById('toggleLang').addEventListener('click', () => {
+  currentLanguage = currentLanguage === 'en' ? 'as' : 'en';
+  
+  const langLabel = document.getElementById('langLabel');
+  const toggleBtn = document.getElementById('toggleLang');
+  
+  if (currentLanguage === 'as') {
+    langLabel.innerHTML = '<i class="fas fa-globe"></i> AS';
+    toggleBtn.innerHTML = '<i class="fas fa-language"></i> English';
+    
+    // Show Assamese content
+    const assameseSample = document.getElementById('assameseSample');
+    if (assameseSample) assameseSample.style.display = 'block';
+    
+    showNotification('Language switched to Assamese', 'info');
+  } else {
+    langLabel.innerHTML = '<i class="fas fa-globe"></i> EN';
+    toggleBtn.innerHTML = '<i class="fas fa-language"></i> Assamese';
+    
+    const assameseSample = document.getElementById('assameseSample');
+    if (assameseSample) assameseSample.style.display = 'none';
+    
+    showNotification('Language switched to English', 'info');
+  }
+});
+
+// Education language selector
+document.getElementById('eduLanguage')?.addEventListener('change', (e) => {
+  const lang = e.target.value;
+  const contentDiv = document.getElementById('multilingualContent');
+  
+  const content = {
+    en: {
+      title: 'Water Safety Guidelines',
+      content: 'Always boil water before drinking. Wash hands frequently with soap. Seek medical help for persistent symptoms.'
+    },
+    as: {
+      title: 'জল সুৰক্ষা নিৰ্দেশনা',
+      content: 'খোৱাৰ আগতে সদায় পানী উতলাওক। চাবোনেৰে সঘনে হাত ধুওক। অবিৰাম লক্ষণৰ বাবে চিকিৎসাৰ সাহায্য লওক।'
+    },
+    bn: {
+      title: 'জল নিরাপত্তা নির্দেশিকা',
+      content: 'পান করার আগে সর্বদা জল ফোটান। সাবান দিয়ে ঘন ঘন হাত ধুয়ে নিন। অবিরাম উপসর্গের জন্য চিকিৎসা সহায়তা নিন।'
+    },
+    hi: {
+      title: 'जल सुरक्षा दिशानिर्देश',
+      content: 'पीने से पहले हमेशा पानी उबालें। साबुन से बार-बार हाथ धोएं। लगातार लक्षणों के लिए चिकित्सा सहायता लें।'
+    },
+    ne: {
+      title: 'पानी सुरक्षा निर्देशन',
+      content: 'पिउनु अगाडि सधैं पानी उमाल्नुहोस्। साबुनले बारम्बार हात धुनुहोस्। निरन्तर लक्षणहरूको लागि चिकित्सा सहायता लिनुहोस्।'
+    }
+  };
+  
+  if (contentDiv && content[lang]) {
+    contentDiv.innerHTML = `
+      <h5>${content[lang].title}</h5>
+      <p>${content[lang].content}</p>
+    `;
+  }
+});
+
+// Map controls
+document.getElementById('refreshMap')?.addEventListener('click', () => {
+  renderMapAndHeat();
+  showNotification('Map refreshed with latest data', 'success');
+});
+
+document.getElementById('toggleHeatmap')?.addEventListener('click', () => {
+  showHeatmap = !showHeatmap;
+  if (showHeatmap) {
+    map.addLayer(heatmapLayer);
+    document.getElementById('toggleHeatmap').innerHTML = '<i class="fas fa-eye-slash"></i> Hide Heatmap';
+    showNotification('Heatmap layer enabled', 'info');
+  } else {
+    map.removeLayer(heatmapLayer);
+    document.getElementById('toggleHeatmap').innerHTML = '<i class="fas fa-layer-group"></i> Show Heatmap';
+    showNotification('Heatmap layer disabled', 'info');
+  }
+});
+
+document.getElementById('fullscreenMap')?.addEventListener('click', () => {
+  const mapContainer = document.getElementById('map');
+  if (mapContainer.requestFullscreen) {
+    mapContainer.requestFullscreen();
+  }
+});
+
+// CSV Download
+document.getElementById('downloadCsv').addEventListener('click', () => {
+  const reports = loadReports();
+  const sensors = loadSensors();
+  
+  if(reports.length === 0 && sensors.length === 0) {
+    showNotification('No data to download', 'warning');
+    return;
+  }
+  
+  // Combine reports and sensor data
+  const combinedData = [
+    ...reports.map(r => ({
+      type: 'report',
+      id: r.id,
+      village: r.village,
+      reporter: r.reporter,
+      contact: r.contact,
+      report_type: r.type,
+      severity: r.severity,
+      notes: r.notes,
+      timestamp: r.ts,
+      synced: r.synced ? 'Yes' : 'No'
+    })),
+    ...sensors.map(s => ({
+      type: 'sensor',
+      id: s.v + '_sensor',
+      village: s.v,
+      contamination: s.contamination,
+      ph: s.ph,
+      turbidity: s.turb,
+      chlorine: s.chlorine,
+      bacteria: s.bacteria,
+      water_level: s.level,
+      timestamp: new Date().toISOString()
+    }))
+  ];
+  
+  const header = ['Type', 'ID', 'Village', 'Reporter', 'Contact', 'Report_Type', 'Severity', 'Notes', 'Contamination', 'pH', 'Turbidity', 'Chlorine', 'Bacteria', 'Water_Level', 'Timestamp', 'Synced'];
+  const csvRows = combinedData.map(row => 
+    header.map(field => `"${(row[field.toLowerCase()] || '').toString().replace(/"/g, '""')}"`).join(',')
+  );
+  const csvContent = [header.join(','), ...csvRows].join('\n');
+  
+  const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sih_health_data_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  showNotification('Data exported successfully', 'success');
+});
+
+// Navigation with page transitions
+document.querySelectorAll('.nav a').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    
+    // Update active navigation
+    document.querySelectorAll('.nav a').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    
+    // Hide all sections with transition
+    document.querySelectorAll('section.card').forEach(s => {
+      s.classList.remove('active');
+      s.style.display = 'none';
+    });
+    
+    // Show target section with transition
+    const target = link.getAttribute('data-page');
+    const section = document.getElementById(`page-${target}`);
+    if (section) {
+      setTimeout(() => {
+        section.style.display = 'block';
+        setTimeout(() => {
+          section.classList.add('active');
+        }, 10);
+      }, 150);
+      
+      // Initialize page-specific functionality
+      if (target === 'dashboard') {
+        renderMapAndHeat();
+        updateStats();
+        generateAlerts();
+      } else if (target === 'report') {
+        renderLocalReports();
+      } else if (target === 'sensors') {
+        updateSensorFeed(loadSensors());
+      } else if (target === 'alerts') {
+        updateAlertHistory();
+      } else if (target === 'logs') {
+        updateSystemLogs();
+      }
+    }
+  });
+});
+
+function updateSystemLogs() {
+  const container = document.getElementById('reportsLog');
+  if (!container) return;
+  
+  const logs = [
+    {type: 'system', level: 'info', message: 'System started successfully', timestamp: new Date(Date.now() - 3600000)},
+    {type: 'user', level: 'info', message: 'New report submitted by ASHA Lily', timestamp: new Date(Date.now() - 3000000)},
+    {type: 'alert', level: 'warning', message: 'High contamination detected in Tamenglong', timestamp: new Date(Date.now() - 1800000)},
+    {type: 'sensor', level: 'info', message: 'Sensor data updated from IoT devices', timestamp: new Date(Date.now() - 900000)},
+    {type: 'system', level: 'error', message: 'Temporary connection issue resolved', timestamp: new Date(Date.now() - 600000)},
+    {type: 'user', level: 'info', message: 'Emergency alert sent to health officials', timestamp: new Date(Date.now() - 300000)},
+    {type: 'alert', level: 'critical', message: 'Outbreak prediction: High risk in Shillong', timestamp: new Date(Date.now() - 120000)},
+    {type: 'system', level: 'info', message: 'Daily backup completed successfully', timestamp: new Date(Date.now() - 60000)}
+  ];
+  
+  container.innerHTML = logs.map(log => {
+    const levelColor = {
+      info: '#1fb6ff',
+      warning: '#ffae42',
+      error: '#ff6b4d',
+      critical: '#ff4d4d'
+    }[log.level];
+    
+    const typeIcon = {
+      system: 'fa-cog',
+      user: 'fa-user',
+      alert: 'fa-bell',
+      sensor: 'fa-microchip'
+    }[log.type];
+    
+    return `
+      <div style="
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        padding: 12px; 
+        margin: 8px 0; 
+        background: rgba(255,255,255,0.05); 
+        border-radius: 8px;
+        border-left: 3px solid ${levelColor};
+      ">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <i class="fas ${typeIcon}" style="margin-right: 8px; color: ${levelColor};"></i>
+            <span class="chip" style="background: ${levelColor}22; color: ${levelColor}; margin-right: 8px;">
+              ${log.level.toUpperCase()}
+            </span>
+            <span class="chip" style="margin-right: 8px;">
+              ${log.type}
+            </span>
+          </div>
+          <div style="font-size: 14px;">
+            ${log.message}
+          </div>
+        </div>
+        <div style="text-align: right; margin-left: 16px;">
+          <div class="small">${log.timestamp.toLocaleString()}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Initialize page
+document.querySelector('.nav a.active').click();
+
+// Simulate initial notification
+setTimeout(() => {
+  showNotification('System initialized successfully. Monitoring 6 locations in real-time.', 'success');
+}, 1000);
+
+// Simulate periodic alerts
+setInterval(() => {
+  if (Math.random() > 0.9) { // 10% chance every 30 seconds
+    const messages = [
+      'New health report received from field worker',
+      'Water quality data updated from sensors',
+      'Routine system health check completed',
+      'Educational content accessed by community member'
+    ];
+    showNotification(messages[Math.floor(Math.random() * messages.length)], 'info');
+  }
+}, 30000);
+
+</script>
+
+</body>
+</html>
